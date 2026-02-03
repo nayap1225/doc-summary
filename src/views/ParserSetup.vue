@@ -90,9 +90,9 @@ const handleGetExample = async () => {
     <section>
       <!-- Header Area -->
       <div
-        class="flex flex-col md:flex-row md:justify-between md:items-center gap-4"
+        class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4"
       >
-        <div class="mb-4">
+        <div class="">
           <h2 class="text-2xl font-bold text-gray-800">파일 업로드</h2>
           <p class="text-gray-500 text-sm">파일을 업로드 하고 요약해 보세요.</p>
         </div>
