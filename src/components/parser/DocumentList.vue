@@ -49,7 +49,7 @@ const toggleExpandAll = () => {
 </script>
 
 <template>
-  <div class="flex flex-col space-y-4">
+  <div class="flex flex-col">
     <!-- Actions Bar -->
     <div
       v-if="store.files.length > 0"
@@ -135,7 +135,7 @@ const toggleExpandAll = () => {
     </div>
 
     <!-- File List Section -->
-    <div class="flex-1 overflow-y-auto space-y-4 pb-10">
+    <div class="flex-1 overflow-y-auto space-y-2">
       <!-- Empty State -->
       <div
         v-if="store.files.length === 0"
