@@ -85,13 +85,13 @@ const handleGetExample = async () => {
 <template>
   <div class="h-full flex flex-col space-y-6">
     <!-- Header Area -->
-    <div class="flex flex-col tb:flex-row tb:justify-between tb:items-center gap-4">
+    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
       <div>
         <h2 class="text-2xl font-bold text-gray-800">파일 업로드</h2>
         <p class="text-gray-500 text-sm mt-1">파일을 업로드 하고 요약해 보세요.</p>
       </div>
       
-      <div class="flex gap-3 self-end tb:self-auto">
+      <div class="flex gap-3 self-end md:self-auto">
         <BaseButton 
           variant="secondary"
           @click="isModalOpen = true"

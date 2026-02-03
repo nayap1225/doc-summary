@@ -795,3 +795,13 @@
 - [x] UI 차리: 개별 요약/추출 버튼 비활성화 로직 제거 (일괄 작업 시에도 클릭 가능)
 - [x] Localization: 에이전트 상태 업데이트('Progress Update') 한글화 적용
 - [ ] 문서 아카이빙 (`npm run archive`)
+
+
+---
+# 📅 Archive Updated: 2026. 02. 03. 10:44:26
+# 📄 File: task.md
+---
+
+- [x] Update `tailwind.config.js` to rename `tb` breakpoint to `md` <!-- id: 0 -->
+- [x] Refactor `src/views/ParserSetup.vue` to use `md:` instead of `tb:` <!-- id: 1 -->
+- [x] Refactor `src/layouts/StudioLayout.vue` to use `md:` instead of `tb:` <!-- id: 2 -->

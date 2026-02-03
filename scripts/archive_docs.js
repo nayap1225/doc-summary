@@ -1,16 +1,16 @@
-
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 // ES Module dirname setting
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configuration
-const ARTIFACT_DIR = 'C:/Users/JiYeong/.gemini/antigravity/brain/e6991f48-02de-47e6-9d9b-a1078392f55a';
-const DOCS_DIR = path.resolve(__dirname, '../docs');
-const TARGET_FILES = ['task.md', 'implementation_plan.md', 'walkthrough.md'];
+const ARTIFACT_DIR =
+  "C:/Users/JiYeong/.gemini/antigravity/brain/927e0ba5-295f-4e21-b600-0a75dae65592";
+const DOCS_DIR = path.resolve(__dirname, "../docs");
+const TARGET_FILES = ["task.md", "implementation_plan.md", "walkthrough.md"];
 
 // Ensure docs directory exists
 if (!fs.existsSync(DOCS_DIR)) {
@@ -19,14 +19,14 @@ if (!fs.existsSync(DOCS_DIR)) {
 }
 
 const getTimestamp = () => {
-  return new Date().toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
+  return new Date().toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
   });
 };
 
@@ -40,7 +40,7 @@ const divider = (filename, timestamp) => `
 `;
 
 async function archiveDocs() {
-  console.log('🚀 Starting documentation archival...');
+  console.log("🚀 Starting documentation archival...");
 
   for (const file of TARGET_FILES) {
     const srcPath = path.join(ARTIFACT_DIR, file);
@@ -48,19 +48,20 @@ async function archiveDocs() {
 
     try {
       if (fs.existsSync(srcPath)) {
-        const content = fs.readFileSync(srcPath, 'utf-8');
+        const content = fs.readFileSync(srcPath, "utf-8");
         const timestamp = getTimestamp();
 
-        let writeMode = 'Created';
+        let writeMode = "Created";
         if (fs.existsSync(destPath)) {
           // Append with divider
           const appendContent = divider(file, timestamp) + content;
-          fs.appendFileSync(destPath, appendContent, 'utf-8');
-          writeMode = 'Appended';
+          fs.appendFileSync(destPath, appendContent, "utf-8");
+          writeMode = "Appended";
         } else {
           // Create new
-          const initialContent = `# ${file} Archive\n` + divider(file, timestamp) + content;
-          fs.writeFileSync(destPath, initialContent, 'utf-8');
+          const initialContent =
+            `# ${file} Archive\n` + divider(file, timestamp) + content;
+          fs.writeFileSync(destPath, initialContent, "utf-8");
         }
 
         console.log(`✅ ${writeMode}: ${file}`);
@@ -72,7 +73,7 @@ async function archiveDocs() {
     }
   }
 
-  console.log('✨ Archival process complete.');
+  console.log("✨ Archival process complete.");
 }
 
 archiveDocs();

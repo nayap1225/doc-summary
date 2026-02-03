@@ -6,7 +6,7 @@ export default {
   ],
   theme: {
     screens: {
-      'tb': '767px',
+      'md': '767px',
       'dt': '1240px',
     },
     extend: {

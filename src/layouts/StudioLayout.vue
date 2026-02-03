@@ -11,7 +11,7 @@
       </header>
 
       <!-- Page Content -->
-      <main class="flex-1 overflow-auto p-4 tb:p-8">
+      <main class="flex-1 overflow-auto p-4 md:p-8">
         <div class="max-w-7xl mx-auto">
           <router-view />
         </div>

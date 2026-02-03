@@ -57,21 +57,18 @@ watch(() => props.isOpen, (newVal) => {
       </div>
 
       <!-- Footer -->
-      <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+      <div class="px-6 py-4 bg-gray-50 flex justify-end gap-2 border-t border-gray-100">
         <BaseButton
           variant="secondary"
           @click="emit('close')"
         >
-          Cancel
+          취소
         </BaseButton>
         <BaseButton
           variant="primary"
           @click="emit('save', localPrompt)"
         >
-          <template #icon-left>
-            <Save class="w-4 h-4" />
-          </template>
-          Save Changes
+          저장
         </BaseButton>
       </div>
     </div>
