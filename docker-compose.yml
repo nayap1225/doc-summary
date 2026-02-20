@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  fe-doc-summary:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fe-doc-summary
+    ports:
+      - "60006:80"
+    restart: always

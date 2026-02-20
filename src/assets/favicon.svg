@@ -1,0 +1,10 @@
+<svg width="100%" height="100%" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Document Outline: Thicker, softer rounded corners + White Fill -->
+  <path d="M25 10H65L90 35V85C90 90.5228 85.5228 95 80 95H25C19.4772 95 15 90.5228 15 85V20C15 14.4772 19.4772 10 25 10Z" fill="white" stroke="#2563EB" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Folded Corner -->
+  <path d="M65 10V35H90" stroke="#2563EB" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Lightning Bolt: Solid fill, chunky shape -->
+  <path d="M58 28L38 58H56L48 82L72 48H56L58 28Z" fill="#2563EB" stroke="#2563EB" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>
