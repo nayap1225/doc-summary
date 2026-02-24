@@ -130,15 +130,15 @@ async function allDeleteHandler() {
           <div class="p-4 flex items-center justify-between">
             <div class="flex items-center gap-2">
               <!-- Icon based on status or type -->
-              <div v-if="item.status === 'idle'" class="w-9 h-9 rounded-2xl bg-gray-50 dark:bg-gray-700/50 flex items-center justify-center text-gray-400 dark:text-gray-500 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/20 group-hover:text-indigo-500 transition-colors duration-300">
+              <div v-if="item.status === 'idle'" class="w-9 h-9 rounded-2xl bg-gray-50 dark:bg-gray-700/50 flex items-center justify-center text-gray-400 dark:text-gray-500 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/20 group-hover:text-indigo-500 transition-colors duration-300 flex-none">
                 <!-- File Type Icon -->
                 <FileAudio v-if="item.fileType === 'audio'" class="w-5 h-5" />
                 <FileText v-else class="w-5 h-5" />
               </div>
-              <div v-else-if="item.status === 'parsing'" class="w-9 h-9 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 flex items-center justify-center text-blue-500">
+              <div v-else-if="item.status === 'parsing'" class="w-9 h-9 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 flex items-center justify-center text-blue-500 flex-none">
                 <Loader2 class="w-5 h-5 animate-spin" />
               </div>
-              <div v-else-if="item.status === 'done'" class="w-9 h-9 rounded-2xl bg-green-50/50 dark:bg-green-900/10 flex items-center justify-center text-green-500">
+              <div v-else-if="item.status === 'done'" class="w-9 h-9 rounded-2xl bg-green-50/50 dark:bg-green-900/10 flex items-center justify-center text-green-500 flex-none">
                 <CheckCircle2 class="w-5 h-5" />
               </div>
               <div v-else class="w-9 h-9 rounded-2xl bg-red-50/50 dark:bg-red-900/10 flex items-center justify-center text-red-500">
