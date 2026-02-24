@@ -1,69 +1,124 @@
-import axios from "axios";
-import { ref, computed } from "vue";
-import { defineStore } from "pinia";
-import { apiParserService } from "../services/apiParserService";
-import { dbService, type SavedDocument } from "../services/db";
+import axios from 'axios';
+import { ref, computed } from 'vue';
+import { defineStore } from 'pinia';
+import { apiParserService } from '../services/apiParserService';
+import { dbService, type SavedDocument } from '../services/db';
 
 export interface FileItem {
   id: string;
   file: File;
-  status: "idle" | "parsing" | "done" | "error";
-  resultType?: "extraction" | "summary";
+  status: 'idle' | 'parsing' | 'done' | 'error';
+  resultType?: 'extraction' | 'summary';
   summary?: string | any[];
-  fileType: "audio" | "document";
+  fileType: 'audio' | 'document';
+  size: number;
   isStarred?: boolean;
 }
 
-export const useParserStore = defineStore("parser", () => {
+export const useParserStore = defineStore('parser', () => {
   const files = ref<FileItem[]>([]);
-  const sessionId = ref<string>("");
+  const sessionId = ref<string>('');
   const isStarred = ref(false);
+  const isPersisting = ref(false); // DB 저장 중 여부
+  const persistQueue = ref<Promise<void>>(Promise.resolve());
 
   // 전역 프로세싱 상태 (하나라도 파싱 중이면 true)
-  const isGlobalProcessing = computed(() => files.value.some((f) => f.status === "parsing"));
+  const isGlobalProcessing = computed(() => files.value.some((f) => f.status === 'parsing'));
 
   // AbortController for cancellation
   const abortController = ref<AbortController | null>(null);
 
   // 초기값: LocalStorage에 저장된 값이 있으면 사용, 없으면 기본값
-  const savedPrompt = localStorage.getItem("systemPrompt");
-  const systemPrompt = ref<string>(savedPrompt || "당신은 유용한 문서 요약 도우미입니다. 문서를 명확하고 간결하게 요약해주세요.");
+  const savedPrompt = localStorage.getItem('systemPrompt');
+  const systemPrompt = ref<string>(savedPrompt || '당신은 유용한 문서 요약 도우미입니다. 문서를 명확하고 간결하게 요약해주세요.');
 
   // 내부 함수: DB에 현재 세션 저장
   const persistSession = async () => {
-    if (!sessionId.value) return;
+    const currentSessionId = sessionId.value;
+    if (!currentSessionId) {
+      console.warn('[Store] No sessionId, skipping persist.');
+      return;
+    }
 
-    // FileItem -> SavedDocument 변환
-    const savedDocs: SavedDocument[] = files.value.map(f => ({
-      id: f.id,
-      fileName: f.file.name,
-      fileType: f.fileType,
-      fileSize: f.file.size,
-      resultType: f.resultType,
-      content: f.resultType === 'extraction' ? (typeof f.summary === 'string' ? f.summary : JSON.stringify(f.summary)) : undefined,
-      summary: f.resultType === 'summary' ? f.summary : undefined,
-      isStarred: f.isStarred,
-      createdAt: Date.now(), // 실제로는 파일 생성시점 등을 써야하지만 단순화
-      updatedAt: Date.now()
-    }));
+    // 순차 저장 보장 (Promise chaining)
+    persistQueue.value = persistQueue.value.then(async () => {
+      try {
+        isPersisting.value = true;
 
-    // 기존 세션 정보 확인 (createdAt 보존 위해)
-    const existingSession = await dbService.getSession(sessionId.value);
+        // 현재 메모리 상태 캡처
+        const currentFiles = files.value;
+        const currentStarred = isStarred.value;
 
-    await dbService.saveSession({
-      id: sessionId.value,
-      files: savedDocs,
-      isStarred: isStarred.value,
-      updatedAt: Date.now(),
-      createdAt: existingSession ? existingSession.createdAt : Date.now()
+        // DB에서 기존 세션 조회 (파일들의 최초 생성일 등을 유지하기 위함)
+        const existingSession = await dbService.getSession(currentSessionId);
+        const existingFilesMap = new Map((existingSession?.files || []).map((f) => [f.id, f]));
+
+        const savedDocs: SavedDocument[] = currentFiles.map((f) => {
+          const existing = existingFilesMap.get(f.id);
+
+          return {
+            id: f.id,
+            fileName: f.file.name,
+            fileType: f.fileType,
+            fileSize: f.size || existing?.fileSize || f.file.size || 0,
+            // 최근 작업한 resultType이 있으면 그걸 쓰고, 아니면 기존 것 유지
+            resultType: f.resultType || existing?.resultType,
+            // extraction 결과 보존
+            content: f.resultType === 'extraction' ? (typeof f.summary === 'string' ? f.summary : JSON.stringify(f.summary)) : existing?.content, // 기존 content 유지
+            // summary 결과 보존
+            summary: f.resultType === 'summary' ? f.summary : existing?.summary, // 기존 summary 유지
+            isStarred: f.isStarred || existing?.isStarred,
+            createdAt: existing?.createdAt || Date.now(),
+            updatedAt: Date.now(),
+          };
+        });
+
+        // 로그 및 검증
+        const analysisCount = savedDocs.filter((d) => d.resultType).length;
+        console.log(`[Store] Attempting to save session: ${currentSessionId}`);
+        console.log(`[Store] Total files: ${savedDocs.length}, Processed: ${analysisCount}`);
+
+        if (savedDocs.length > 0) {
+          console.table(
+            savedDocs.map((d) => ({
+              name: d.fileName,
+              type: d.resultType,
+              hasContent: !!d.content,
+              hasSummary: !!d.summary,
+            })),
+          );
+        }
+
+        const sessionData = {
+          id: currentSessionId,
+          files: savedDocs,
+          isStarred: currentStarred,
+          updatedAt: Date.now(),
+          createdAt: existingSession ? existingSession.createdAt : Date.now(),
+        };
+
+        // [Fix] DataCloneError: Vue Proxies cannot be cloned to IndexedDB.
+        // Use JSON.parse(JSON.stringify()) to ensure a clean, non-reactive object.
+        const cleanSessionData = JSON.parse(JSON.stringify(sessionData));
+
+        await dbService.saveSession(cleanSessionData);
+
+        console.log('[Store] Session persistence successful.');
+      } catch (error) {
+        console.error('[Store] Fatal persistence error:', error);
+      } finally {
+        isPersisting.value = false;
+      }
     });
+
+    return persistQueue.value;
   };
 
   // 초기 로드: 세션 확인 및 복원
   (async () => {
     try {
       // 1. SessionStorage에서 ID 확인
-      const storedSessionId = sessionStorage.getItem("parser_session_id");
+      const storedSessionId = sessionStorage.getItem('parser_session_id');
 
       if (storedSessionId) {
         // 기존 세션 복원 시도
@@ -73,22 +128,29 @@ export const useParserStore = defineStore("parser", () => {
         if (session && session.files.length > 0) {
           files.value = session.files.map((doc) => ({
             id: doc.id,
-            file: new File([""], doc.fileName, { type: doc.fileType === 'audio' ? 'audio/mp3' : 'text/plain' }),
-            status: "done",
+            file: new File([''], doc.fileName, { type: doc.fileType === 'audio' ? 'audio/mp3' : 'text/plain' }),
+            status: doc.resultType ? 'done' : doc.summary ? 'error' : 'idle',
             resultType: doc.resultType,
             summary: doc.resultType === 'summary' ? doc.summary : doc.content,
             fileType: doc.fileType,
+            size: doc.fileSize || 0,
           }));
         }
       } else {
         // 새 세션 생성
-        const newId = crypto.randomUUID();
+        const newId = crypto.randomUUID
+          ? crypto.randomUUID()
+          : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+              const r = (Math.random() * 16) | 0,
+                v = c == 'x' ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
+            });
         sessionId.value = newId;
-        sessionStorage.setItem("parser_session_id", newId);
+        sessionStorage.setItem('parser_session_id', newId);
         // 빈 세션은 아직 DB에 저장하지 않음 (Lazy Save)
       }
     } catch (e) {
-      console.error("Failed to init session:", e);
+      console.error('Failed to init session:', e);
     }
   })();
 
@@ -96,13 +158,20 @@ export const useParserStore = defineStore("parser", () => {
   function addFiles(newFiles: FileList | File[]) {
     const fileArray = Array.isArray(newFiles) ? newFiles : Array.from(newFiles);
     fileArray.forEach((file) => {
-      const id = crypto.randomUUID();
+      const id = crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = (Math.random() * 16) | 0,
+              v = c == 'x' ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          });
       // Store state 추가
       files.value.push({
         id,
         file,
-        status: "idle",
+        status: 'idle',
         fileType: detectFileType(file),
+        size: file.size,
       });
 
       // DB 저장 (기본 정보)
@@ -123,13 +192,13 @@ export const useParserStore = defineStore("parser", () => {
   async function updateSystemPrompt(newPrompt: string) {
     // 1. 낙관적 업데이트 (UI 먼저 반영)
     systemPrompt.value = newPrompt;
-    localStorage.setItem("systemPrompt", newPrompt);
+    localStorage.setItem('systemPrompt', newPrompt);
 
     // 2. 서버 저장
     try {
       await apiParserService.saveSystemPrompt(newPrompt);
     } catch (error) {
-      console.error("Failed to save system prompt to server:", error);
+      console.error('Failed to save system prompt to server:', error);
     }
   }
 
@@ -139,10 +208,10 @@ export const useParserStore = defineStore("parser", () => {
       const prompt = await apiParserService.getSystemPrompt();
       if (prompt) {
         systemPrompt.value = prompt;
-        localStorage.setItem("systemPrompt", prompt);
+        localStorage.setItem('systemPrompt', prompt);
       }
     } catch (error) {
-      console.warn("Failed to fetch system prompt, using existing value.", error);
+      console.warn('Failed to fetch system prompt, using existing value.', error);
     }
   }
 
@@ -156,7 +225,7 @@ export const useParserStore = defineStore("parser", () => {
 
   // Cleanup Helper
   function checkCleanup() {
-    if (!files.value.some((f) => f.status === "parsing")) {
+    if (!files.value.some((f) => f.status === 'parsing')) {
       abortController.value = null;
     }
   }
@@ -168,20 +237,20 @@ export const useParserStore = defineStore("parser", () => {
 
     const activeSignal = signal || ensureController().signal;
 
-    item.status = "parsing";
+    item.status = 'parsing';
     try {
       console.log(`[Store] Analyzing ${item.fileType}...`);
 
       let result: string | any[];
-      if (item.fileType === "audio") {
+      if (item.fileType === 'audio') {
         result = await apiParserService.dializeFile(item.file, activeSignal);
       } else {
         result = await apiParserService.analyzeDocument(item.file, systemPrompt.value, activeSignal);
       }
 
       item.summary = result;
-      item.resultType = "summary";
-      item.status = "done";
+      item.resultType = 'summary';
+      item.status = 'done';
 
       // DB 업데이트
       // const existingDoc = await dbService.getDocument(item.id); // This is now handled by persistSession
@@ -194,15 +263,15 @@ export const useParserStore = defineStore("parser", () => {
       //   });
       // }
       persistSession();
-
     } catch (error: any) {
       if (axios.isCancel(error)) {
-        console.log("Summarize canceled");
-        item.status = "idle";
+        console.log('Summarize canceled');
+        item.status = 'idle';
       } else {
-        console.error("Analyze error:", error);
-        item.status = "error";
-        item.summary = "요약 중 오류가 발생했습니다.";
+        console.error('Analyze error:', error);
+        item.status = 'error';
+        item.summary = '요약 중 오류가 발생했습니다.';
+        await persistSession(); // 에러 상태(메시지)를 저장하여 새로고침 후에도 유지되게 함
       }
     } finally {
       if (!signal) checkCleanup();
@@ -216,20 +285,20 @@ export const useParserStore = defineStore("parser", () => {
 
     const activeSignal = signal || ensureController().signal;
 
-    item.status = "parsing";
+    item.status = 'parsing';
     try {
       console.log(`[Store] Extracting text (Type: ${item.fileType})...`);
 
       let result: string | any[];
-      if (item.fileType === "audio") {
+      if (item.fileType === 'audio') {
         result = await apiParserService.dializeFile(item.file, activeSignal);
       } else {
         result = await apiParserService.parseDocument(item.file, activeSignal);
       }
 
       item.summary = result;
-      item.resultType = "extraction";
-      item.status = "done";
+      item.resultType = 'extraction';
+      item.status = 'done';
 
       // DB 업데이트
       // const existingDoc = await dbService.getDocument(item.id); // This is now handled by persistSession
@@ -242,15 +311,15 @@ export const useParserStore = defineStore("parser", () => {
       //   });
       // }
       persistSession();
-
     } catch (error: any) {
       if (axios.isCancel(error)) {
-        console.log("Parse canceled");
-        item.status = "idle";
+        console.log('Parse canceled');
+        item.status = 'idle';
       } else {
-        console.error("Parse error:", error);
-        item.status = "error";
-        item.summary = "텍스트 추출 중 오류가 발생했습니다.";
+        console.error('Parse error:', error);
+        item.status = 'error';
+        item.summary = '텍스트 추출 중 오류가 발생했습니다.';
+        await persistSession(); // 에러 상태를 저장하여 새로고침 후에도 유지되게 함
       }
     } finally {
       if (!signal) checkCleanup();
@@ -259,10 +328,10 @@ export const useParserStore = defineStore("parser", () => {
 
   // 전체 텍스트 추출 실행 (순차 처리)
   async function parseAll() {
-    const targetFiles = files.value.filter((f) => f.status === "idle" || f.status === "error");
+    const targetFiles = files.value.filter((f) => f.status === 'idle' || f.status === 'error');
     if (targetFiles.length === 0) return;
 
-    targetFiles.forEach((f) => (f.status = "parsing"));
+    targetFiles.forEach((f) => (f.status = 'parsing'));
     const controller = ensureController();
 
     try {
@@ -272,7 +341,7 @@ export const useParserStore = defineStore("parser", () => {
       }
     } finally {
       targetFiles.forEach((f) => {
-        if (f.status === "parsing") f.status = "idle";
+        if (f.status === 'parsing') f.status = 'idle';
       });
       checkCleanup();
     }
@@ -280,10 +349,10 @@ export const useParserStore = defineStore("parser", () => {
 
   // 전체 요약 실행 (순차 처리)
   async function summarizeAll() {
-    const targetFiles = files.value.filter((f) => f.status === "idle" || f.status === "error");
+    const targetFiles = files.value.filter((f) => f.status === 'idle' || f.status === 'error');
     if (targetFiles.length === 0) return;
 
-    targetFiles.forEach((f) => (f.status = "parsing"));
+    targetFiles.forEach((f) => (f.status = 'parsing'));
     const controller = ensureController();
 
     try {
@@ -293,7 +362,7 @@ export const useParserStore = defineStore("parser", () => {
       }
     } finally {
       targetFiles.forEach((f) => {
-        if (f.status === "parsing") f.status = "idle";
+        if (f.status === 'parsing') f.status = 'idle';
       });
       checkCleanup();
     }
@@ -327,24 +396,27 @@ export const useParserStore = defineStore("parser", () => {
       if (session) {
         // 현재 세션 ID 교체
         sessionId.value = session.id;
-        sessionStorage.setItem("parser_session_id", session.id);
+        sessionStorage.setItem('parser_session_id', session.id);
         isStarred.value = session.isStarred || false;
 
-        // 파일 목록 복원
-        files.value = session.files.map((doc) => ({
-          id: doc.id,
-          file: new File([""], doc.fileName, { type: doc.fileType === 'audio' ? 'audio/mp3' : 'text/plain' }),
-          status: "done",
-          resultType: doc.resultType,
-          summary: doc.resultType === 'summary' ? doc.summary : doc.content,
-          fileType: doc.fileType,
-          isStarred: doc.isStarred,
-        }));
+        // 파일 목록 복원 (처리 완료된 파일만)
+        files.value = session.files
+          .filter((doc) => doc.resultType) // 요약 또는 추출이 완료된 파일만 필터링
+          .map((doc) => ({
+            id: doc.id,
+            file: new File([''], doc.fileName, { type: doc.fileType === 'audio' ? 'audio/mp3' : 'text/plain' }),
+            status: 'done', // 필터링을 거쳤으므로 무조건 done 상태
+            resultType: doc.resultType,
+            summary: doc.resultType === 'summary' ? doc.summary : doc.content,
+            fileType: doc.fileType,
+            isStarred: doc.isStarred,
+            size: doc.fileSize,
+          }));
 
         return true;
       }
     } catch (e) {
-      console.error("Failed to load session:", e);
+      console.error('Failed to load session:', e);
     }
     return false;
   }
@@ -358,7 +430,7 @@ export const useParserStore = defineStore("parser", () => {
       // 새 세션 생성 로직 (초기화와 동일)
       const newId = crypto.randomUUID();
       sessionId.value = newId;
-      sessionStorage.setItem("parser_session_id", newId);
+      sessionStorage.setItem('parser_session_id', newId);
       persistSession();
     }
   }
@@ -372,9 +444,15 @@ export const useParserStore = defineStore("parser", () => {
     // systemPrompt.value = ... (필요 시 초기화)
 
     // 새 아이디 발급
-    const newId = crypto.randomUUID();
+    const newId = crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+          const r = (Math.random() * 16) | 0,
+            v = c == 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
     sessionId.value = newId;
-    sessionStorage.setItem("parser_session_id", newId);
+    sessionStorage.setItem('parser_session_id', newId);
 
     // DB에 빈 세션 저장하지 않음 (Lazy Save: 파일 추가 시 저장됨)
     // DB에 빈 세션 저장하지 않음 (Lazy Save: 파일 추가 시 저장됨)
@@ -388,7 +466,7 @@ export const useParserStore = defineStore("parser", () => {
 
   // 파일 중요 표시 토글
   async function toggleFileStar(fileId: string) {
-    const file = files.value.find(f => f.id === fileId);
+    const file = files.value.find((f) => f.id === fileId);
     if (file) {
       file.isStarred = !file.isStarred;
       await persistSession();
@@ -401,13 +479,26 @@ export const useParserStore = defineStore("parser", () => {
     if (session) {
       // Toggle
       session.isStarred = !session.isStarred;
-      await dbService.saveSession(session);
+      // [Fix] Safety wrap to prevent DataCloneError
+      await dbService.saveSession(JSON.parse(JSON.stringify(session)));
 
       // 만약 현재 보고 있는 세션이라면 상태 동기화
       if (sessionId.value === targetSessionId) {
         isStarred.value = session.isStarred;
       }
     }
+  }
+
+  // 세션 제목 업데이트
+  async function updateSessionTitle(targetSessionId: string, newTitle: string) {
+    const session = await dbService.getSession(targetSessionId);
+    if (session) {
+      session.title = newTitle;
+      session.updatedAt = Date.now();
+      await dbService.saveSession(JSON.parse(JSON.stringify(session)));
+      return true;
+    }
+    return false;
   }
 
   return {
@@ -431,11 +522,12 @@ export const useParserStore = defineStore("parser", () => {
     toggleSessionStar,
     toggleFileStar,
     toggleSessionListItemStar,
+    updateSessionTitle,
   };
 });
 
-function detectFileType(file: File): "audio" | "document" {
-  if (file.type.startsWith("audio/")) return "audio";
-  if (/\.(mp3|wav|m4a|ogg|wma|aac|flac)$/i.test(file.name)) return "audio";
-  return "document";
+function detectFileType(file: File): 'audio' | 'document' {
+  if (file.type.startsWith('audio/')) return 'audio';
+  if (/\.(mp3|wav|m4a|ogg|wma|aac|flac)$/i.test(file.name)) return 'audio';
+  return 'document';
 }

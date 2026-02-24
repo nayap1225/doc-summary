@@ -1,20 +1,15 @@
 import { ref } from 'vue';
 import { defineStore } from 'pinia';
 
-type AlertType = 'info' | 'error' | 'warning' | 'success';
-
-export const useAlertStore = defineStore('alert', () => {
+export const useConfirmStore = defineStore('confirm', () => {
   const isOpen = ref(false);
   const title = ref('');
   const message = ref('');
-  const type = ref<AlertType>('info');
+  let resolvePromise: ((value: boolean) => void) | null = null;
 
-  let resolvePromise: (() => void) | null = null;
-
-  function open(newTitle: string, newMessage: string, newType: AlertType = 'info'): Promise<void> {
+  async function open(newTitle: string, newMessage: string): Promise<boolean> {
     title.value = newTitle;
     message.value = newMessage;
-    type.value = newType;
     isOpen.value = true;
 
     return new Promise((resolve) => {
@@ -22,10 +17,18 @@ export const useAlertStore = defineStore('alert', () => {
     });
   }
 
-  function close() {
+  function confirm() {
     isOpen.value = false;
     if (resolvePromise) {
-      resolvePromise();
+      resolvePromise(true);
+      resolvePromise = null;
+    }
+  }
+
+  function cancel() {
+    isOpen.value = false;
+    if (resolvePromise) {
+      resolvePromise(false);
       resolvePromise = null;
     }
   }
@@ -34,8 +37,8 @@ export const useAlertStore = defineStore('alert', () => {
     isOpen,
     title,
     message,
-    type,
     open,
-    close,
+    confirm,
+    cancel,
   };
 });

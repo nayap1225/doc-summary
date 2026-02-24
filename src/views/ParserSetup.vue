@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useParserStore } from "../stores/parser";
-import SystemPromptModal from "../components/SystemPromptModal.vue";
-import FileUpload from "../components/parser/FileUpload.vue";
-import DocumentList from "../components/parser/DocumentList.vue";
-import BaseButton from "../components/common/BaseButton.vue";
-import { Settings, RotateCcw, ChevronDown, Plus, Star } from "lucide-vue-next";
+import { ref } from 'vue';
+import { useParserStore } from '../stores/parser';
+import SystemPromptModal from '../components/SystemPromptModal.vue';
+import FileUpload from '../components/parser/FileUpload.vue';
+import DocumentList from '../components/parser/DocumentList.vue';
+import BaseButton from '../components/common/BaseButton.vue';
+import { Settings, RotateCcw, ChevronDown, Plus, Star } from 'lucide-vue-next';
 
 const store = useParserStore();
 const isModalOpen = ref(false);
@@ -27,52 +27,54 @@ const saveSystemPrompt = async (newPrompt: string) => {
 };
 
 // --- Temporary API Testing Logic ---
-import { apiParserService } from "../services/apiParserService";
+import { apiParserService } from '../services/apiParserService';
+import { useAlertStore } from '../stores/alert';
 
-const evaluationResult = ref<string>("");
-const exampleResult = ref<string>("");
+const alertStore = useAlertStore();
+const evaluationResult = ref<string>('');
+const exampleResult = ref<string>('');
 const isJudging = ref(false);
 const isFetchingExample = ref(false);
 
 // Input states
-const judgeInput = ref("");
-const exampleInput = ref<number | "">("");
+const judgeInput = ref('');
+const exampleInput = ref<number | ''>('');
 
 const handleJudgePrompt = async () => {
   if (!judgeInput.value.trim()) {
-    alert("프롬프트를 입력해주세요.");
+    alertStore.open('입력 오류', '프롬프트를 입력해주세요.', 'warning');
     return;
   }
   isJudging.value = true;
   try {
     evaluationResult.value = await apiParserService.judgeSystemPrompt(judgeInput.value);
   } catch (error) {
-    evaluationResult.value = "Failed to evaluate prompt.";
+    evaluationResult.value = 'Failed to evaluate prompt.';
   } finally {
     isJudging.value = false;
   }
 };
 
 const clearJudgeResult = () => {
-  judgeInput.value = "";
-  evaluationResult.value = "";
+  judgeInput.value = '';
+  evaluationResult.value = '';
 };
 
 const clearExampleResult = () => {
-  exampleInput.value = "";
-  exampleResult.value = "";
+  exampleInput.value = '';
+  exampleResult.value = '';
 };
 
 const handleGetExample = async () => {
-  if (typeof exampleInput.value !== "number") {
-    alert("숫자를 입력해주세요.");
+  if (typeof exampleInput.value !== 'number') {
+    alertStore.open('입력 오류', '숫자를 입력해주세요.', 'warning');
     return;
   }
   isFetchingExample.value = true;
   try {
     exampleResult.value = await apiParserService.getExampleSystemPrompt(exampleInput.value);
   } catch (error) {
-    exampleResult.value = "Failed to fetch example.";
+    exampleResult.value = 'Failed to fetch example.';
   } finally {
     isFetchingExample.value = false;
   }
@@ -136,13 +138,7 @@ const handleGetExample = async () => {
             <h4 class="font-semibold text-gray-700 dark:text-gray-300">프롬프트 평가</h4>
           </div>
           <div class="flex gap-2 mb-2 items-center">
-            <input
-              v-model="judgeInput"
-              type="text"
-              placeholder="평가할 프롬프트 입력"
-              class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm w-full bg-white dark:bg-gray-700 dark:text-gray-100"
-              @keyup.enter="handleJudgePrompt"
-            />
+            <input v-model="judgeInput" type="text" placeholder="평가할 프롬프트 입력" class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm w-full bg-white dark:bg-gray-700 dark:text-gray-100" @keyup.enter="handleJudgePrompt" />
             <BaseButton class="flex-none" size="md" variant="outline" :loading="isJudging" @click="handleJudgePrompt" :disabled="!judgeInput.trim()"> 호출 </BaseButton>
             <button @click="clearJudgeResult" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition" title="초기화">
               <RotateCcw class="w-4 h-4" />
@@ -159,13 +155,7 @@ const handleGetExample = async () => {
             <h4 class="font-semibold text-gray-700 dark:text-gray-300">프롬프트 예시</h4>
           </div>
           <div class="flex gap-2 mb-2 items-center">
-            <input
-              v-model.number="exampleInput"
-              type="number"
-              placeholder="숫자 입력"
-              class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm w-full bg-white dark:bg-gray-700 dark:text-gray-100"
-              @keyup.enter="handleGetExample"
-            />
+            <input v-model.number="exampleInput" type="number" placeholder="숫자 입력" class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 text-sm w-full bg-white dark:bg-gray-700 dark:text-gray-100" @keyup.enter="handleGetExample" />
             <BaseButton class="flex-none" size="md" variant="outline" :loading="isFetchingExample" @click="handleGetExample" :disabled="exampleInput === ''"> 호출 </BaseButton>
             <button @click="clearExampleResult" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition" title="초기화">
               <RotateCcw class="w-4 h-4" />
