@@ -67,8 +67,7 @@ const onDrop = (event: DragEvent) => {
     <div class="flex flex-col items-center justify-center gap-2 text-gray-500 dark:text-gray-400">
       <div class="flex items-center gap-2">
         <UploadCloud class="w-6 h-6" />
-        <span class="md:block hidden font-medium">여기를 클릭하거나 파일을 드래그해서 업로드하세요.</span>
-        <span class="md:hidden font-medium">파일을 업로드하세요.</span>
+        <span class="font-medium">click or drag files here to upload</span>
       </div>
       <p class="text-sm text-gray-500 dark:text-gray-500 mt-1">
         지원하는 문서 포멧: <span class="font-semibold text-indigo-600 dark:text-indigo-400">TXT, DOCX, PDF, HWP</span><br />

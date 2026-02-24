@@ -161,7 +161,7 @@ async function allDeleteHandler() {
 
             <!-- Action Buttons -->
             <div class="flex gap-1 items-center">
-              <button v-if="item.status === 'done'" @click="store.toggleFileStar(item.id)" class="p-1.5 rounded-lg transition-colors mr-1" :class="item.isStarred ? 'text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20' : 'text-gray-300 hover:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20'" title="중요 파일 표시">
+              <button v-if="item.status === 'done'" @click="store.toggleFileStar(item.id)" class="p-1.5 rounded-lg transition-colors" :class="item.isStarred ? 'text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20' : 'text-gray-300 hover:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20'" title="중요 파일 표시">
                 <Star class="w-4 h-4" :class="{ 'fill-current': item.isStarred }" />
               </button>
 
